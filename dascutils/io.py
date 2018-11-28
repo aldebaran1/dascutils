@@ -238,7 +238,7 @@ def load(fin: Union[Path, Sequence[Path]],
         data.coords['lon'] = (('y','x'), lon)
         data.attrs['alt_m'] = mapping_altitude
     data.attrs['filename'] = ' '.join((p.name for p in flist))
-    data.attrs['wavelength'] = wavelen if isinstance(wavelen, (int,float)) else '000'
+    data.attrs['wavelength'] = np.squeeze(np.unique(wavelen)) if (wavelen is not None) else '000'
 
 # %% Save to netCDF?
     if ofn is None:
@@ -366,11 +366,11 @@ def save2HDF(data: xarray.Dataset=None,
         raise ('Input data invalid')
     if (fn_out is '') or (fn_out is None):
         print ('Path/output file not given. Default is desktop!')
-        fn_out = Path.home() / 'Desktop' / 'dasc_out.nc'
+        fn_out = Path.home() / 'Desktop' / 'interp.nc'
     
     if isinstance(fn_out, str): fn_out = Path(fn_out).expanduser()
     
-    if fn_out.is_dir(): fn_out = fn_out / 'dasc_out.nc'
+    if fn_out.is_dir(): fn_out = fn_out / 'interp.nc'
     
     if (fn_out.suffix != '.nc') or (fn_out.suffix != '.h5') or (fn_out.suffix != '.hdf5'):
         fn_out = fn_out.with_suffix('.nc')
