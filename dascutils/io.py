@@ -19,7 +19,7 @@ try:
 except ImportError:
     downscale_local_mean = None
     
-from .processing import interpolateCoordinate, circular2lla, datetime2posix
+from .processing import interpolateCoordinate, interpSpeedUp, circular2lla, datetime2posix
 
 log = logging.getLogger('DASCutils-io')
 
@@ -224,7 +224,7 @@ def load(fin: Union[Path, Sequence[Path]],
 # %% az/el -> lat/lon
     if coordinate == 'wsg':
         if mapping_altitude is None:
-            mapping_altitude = 100
+            mapping_altitude = 100 # In kilometers
             print ('Attribute mapping altitude was not set! Deafult is set to 100 km.')
 
         # Get rid of NaNs in the coordinates' arrays
@@ -234,9 +234,15 @@ def load(fin: Union[Path, Sequence[Path]],
         lat, lon, alt = circular2lla(az = azi, el = eli, lat0 = lla['lat'], 
                                      lon0 = lla['lon'], alt0 = 0,
                                      mapping_altitude = mapping_altitude)
-        data.coords['lat'] = (('x','y'), lat)
-        data.coords['lon'] = (('y','x'), lon)
+        # Interpolate WSG84 coordinated and image into an ascending pixel order
+        # utilizing Delauny triangularion super speed up interpolation
+        X,Y,Z = interpSpeedUp(x_in = lon, y_in = lat, image = img[wavelen == w, ...], verbose = True)
+        
+        data['image'] = (('time', 'x', 'y'), Z)
+        data.coords['lat'] = (('x','y'), Y)
+        data.coords['lon'] = (('x','y'), X)
         data.attrs['alt_m'] = mapping_altitude
+        
     data.attrs['filename'] = ' '.join((p.name for p in flist))
     data.attrs['wavelength'] = np.squeeze(np.unique(wavelen)) if (wavelen is not None) else '000'
 
