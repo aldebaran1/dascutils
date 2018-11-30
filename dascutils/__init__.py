@@ -5,7 +5,8 @@ from dateutil.parser import parse
 from datetime import datetime
 from urllib.parse import urlparse
 from .io import load # noqa: F401
-from .processing import interpSpeedUp, circular2lla, datetime2posix, interpolateCoordinate, interp, interpWeights # noqa: F401
+from .utils import interpSpeedUp, circular2lla, datetime2posix, interpolateCoordinate, interp, interpWeights # noqa: F401
+from .utils import getPixelBrightness, getDASCimage # noqa: F401
 
 def totimestamp(t):
     """

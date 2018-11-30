@@ -5,11 +5,11 @@ Created on Fri Sep 28 11:43:24 2018
 
 @author: smrak
 """
-
+import xarray
 import numpy as np
 import datetime
 from typing import Union
-from  scipy.spatial import Delaunay
+from scipy.spatial import Delaunay
 from pymap3d import aer2geodetic
 from scipy.interpolate import griddata
 
@@ -107,7 +107,7 @@ def interpSpeedUp(x_in: Union[list,np.ndarray] = None,
     xy[:,0] = x
     xy[:,1] = y
     # New Coordinates: Flattern into a 2D array. Same as for the old
-    uv = np.zeros([xgrid.shape[0]*xgrid.shape[1],2])
+    uv = np.zeros([xgrid.shape[0] * xgrid.shape[1],2])
     uv[:,0] = xgrid.flatten()
     uv[:,1] = ygrid.flatten()
     # trinagulate to new grids, simplex wights for a new grid, barycentric 
@@ -148,6 +148,72 @@ def circular2lla(az: Union[list,np.ndarray] = None,
     lat, lon, alt = aer2geodetic(az, el, r, lat0, lon0, alt0)
     # 
     return lat, lon, alt
+
+def getPixelBrightness(D: xarray.Dataset = None, 
+                       obstimes: Union[np.ndarray, list] = None,
+                       obs_lon: Union[int, float, np.ndarray, list] = None, 
+                       obs_lat: Union[int, float, np.ndarray, list] = None,
+                       coordinates: bool = False):
+    assert isinstance(obstimes[0], datetime.datetime)
+    # Coordinates
+    dasc_lat = D.lat.values
+    dasc_lon = D.lon.values
+    # DASC obstimes
+    dasc_time = np.array([datetime.datetime.utcfromtimestamp(t) for t in D.time.values])
+    # Filter according to time requirement
+    treq = (dasc_time >= obstimes[0]) & (dasc_time <= obstimes[-1])
+    Dtimes = dasc_time[treq]
+    
+    # GET BRIGHTNESS
+    # fixed position
+    if isinstance(obs_lon, (int,float)) and isinstance(obs_lat, (int,float)):
+        idx = abs(obs_lon - dasc_lon[0, :]).argmin()
+        idy = abs(obs_lat - dasc_lat[:, 0]).argmin()
+        lon = dasc_lon[0,idx]
+        lat = dasc_lat[idy,0]
+        pixel_brightness = D.image[treq][:,idx,idy].values
+    # non-stationary point
+    else:
+        lon = []
+        lat = []
+        pixel_brightness = []
+        for i in range(Dtimes.shape[0]):
+            idt = abs(Dtimes[i] - obstimes).argmin()
+            idx = abs(obs_lon[idt] - dasc_lon[0, :]).argmin()
+            idy = abs(obs_lat[idt] - dasc_lat[:, 0]).argmin()
+            lon.append(dasc_lon[0,idx])
+            lat.append(dasc_lat[idy,0])
+            pixel_brightness.append(D.image[treq][i,idx,idy].values)
+        pixel_brightness = np.array(pixel_brightness)
+        
+    # Return brightness time-series
+    if coordinates:
+        return Dtimes, pixel_brightness, lon, lat
+    else:
+        return Dtimes, pixel_brightness
+    
+def getDASCimage(D: xarray.Dataset = None,
+                 ix: Union[datetime.datetime,int] = None,
+                 coordinate: str = 'wsg'):
+    assert isinstance(ix, (datetime.datetime, int))
+    # Find the closes entrance for the given timestamp
+    if isinstance(ix, datetime.datetime): 
+        T = datetime2posix(ix)[0]
+        Di = D.sel(time=T, method = 'nearest')
+        dasc_dt = datetime.datetime.utcfromtimestamp(Di.time.values)
+        if coordinate == 'polar':
+            img = Di.polar.values
+        elif coordinate == 'wsg':
+            img = Di.image.values
+    # Find for the given index
+    if isinstance(ix, int):
+        dasc_dt = datetime.datetime.utcfromtimestamp(D.time.values[ix])
+        if coordinate == 'polar':
+            img = D.polar.values[ix]
+        elif coordinate == 'wsg':
+            img = D.image.values[ix]
+        
+    return dasc_dt, img
 
 def datetime2posix(dtime):
     """

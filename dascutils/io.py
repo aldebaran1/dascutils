@@ -19,17 +19,18 @@ try:
 except ImportError:
     downscale_local_mean = None
     
-from .processing import interpolateCoordinate, interpSpeedUp, circular2lla, datetime2posix
+from .utils import interpolateCoordinate, interpSpeedUp, circular2lla, datetime2posix
 
 log = logging.getLogger('DASCutils-io')
 
 def load(fin: Union[Path, Sequence[Path]],
-         azelfn: Union[Path, Sequence[Path]]=None,
-         treq: np.ndarray=None,
-         wavelenreq: list=None, verbose: bool=False,
-         coordinate: str='polar',
-         mapping_altitude: Union[int,float]=None,
-         ofn: Union[Path,str]=None) -> xarray.Dataset:
+         azelfn: Union[Path, Sequence[Path]] = None,
+         treq: np.ndarray = None,
+         wavelenreq: list = None, verbose: bool = False,
+         coordinate: str = 'polar',
+         mapping_altitude: Union[int,float] = None,
+         el_mask: Union[int, float] = None,
+         ofn: Union[Path,str] = None) -> xarray.Dataset:
     """
     reads FITS images and spatial az/el calibration for allsky camera
     Bdecl is in degrees, from IGRF model
@@ -154,14 +155,14 @@ def load(fin: Union[Path, Sequence[Path]],
             log.warning(f'{fn} has error {e}')
 
 # %% collect output
-    img = np.array(img)
+    img = np.array(img, dtype=float)
 
     time = np.array(time)  # this prevents xarray from using nanaseconds M8 datetime64 that is annoying.
     if len(wavelen) == 0 or wavelen[0] is None:
         wavelen = None
 
     if wavelen is None:
-        data = xarray.Dataset({'000': (('time', 'y', 'x'), img)},
+        data = xarray.Dataset({'polar': (('time', 'y', 'x'), img)},
                               coords={'time': time})
         if data.time.size > 1:  # more than 1 image
             data.attrs['cadence'] = round( ((time[1]-time[0]).total_seconds()),2)  # NOTE: assumes uniform kinetic rate
@@ -169,8 +170,12 @@ def load(fin: Union[Path, Sequence[Path]],
         data = None
         cadence = {}
         for w in np.unique(wavelen):
-            d = xarray.Dataset({str(w): (('time', 'y', 'x'), img[wavelen == w, ...])},
-                               coords={'time': time[wavelen == w]})
+            if np.unique(wavelen).shape[0] > 1:
+                d = xarray.Dataset({'polar' + str(w): (('time', 'y', 'x'), img[wavelen == w, ...])},
+                                    coords={'time': time[wavelen == w]})
+            else:
+                d = xarray.Dataset({'polar': (('time', 'y', 'x'), img)},
+                                    coords={'time': time[wavelen == w]})
             if d.time.size > 1:  # more than 1 image
                 cadence[w] = round(((d.time[1] - d.time[0]).item()*1e-9),2)  # NOTE: assumes uniform kinetic rate
             else:
@@ -210,34 +215,46 @@ def load(fin: Union[Path, Sequence[Path]],
 
             if wavelen is None:
                 if downscale != 1:
-                    data['000'] = (('time', 'y', 'x'), downscale_local_mean(data['000'], downscale))
+                    data['polar'] = (('time', 'y', 'x'), downscale_local_mean(data['000'], downscale))
                 else:
-                    data['000'] = (('time', 'y', 'x'), data['000'])
+                    data['polar'] = (('time', 'y', 'x'), data['000'])
             else:
                 if downscale != 1:
                     for w in np.unique(wavelen):
-                        data[w] = downscale_local_mean(data[w], downscale)
+                        if np.unique(wavelen).shape[0] > 1:
+                            indic = 'polar' + str(w)
+                            data[indic] = downscale_local_mean(data[w], downscale)
+                        else:
+                            data['polar'] = downscale_local_mean(data[w], downscale)
 
-        data['az'] = azel['az']
-        data['el'] = azel['el']
-        
 # %% az/el -> lat/lon
     if coordinate == 'wsg':
         if mapping_altitude is None:
-            mapping_altitude = 100 # In kilometers
-            print ('Attribute mapping altitude was not set! Deafult is set to 100 km.')
+            malt = {'558': 110, '427': 90, '630': 220, '000': 100}
+            mapping_altitude = malt[np.squeeze(wavelen)[0]] # In kilometers
+            print ('Attribute mapping altitude was not set! Deafult is set to {} km.'.format(mapping_altitude))
 
         # Get rid of NaNs in the coordinates' arrays
-        eli = interpolateCoordinate(azel['el'].values, N = azel['el'].values.shape[0], method = 'nearest')
-        azi = interpolateCoordinate(azel['az'].values, N = azel['el'].values.shape[0], method = 'nearest')
+        eli = interpolateCoordinate(azel['el'].values, 
+                                    N = azel['el'].values.shape[0], 
+                                    method = 'nearest')
+        azi = interpolateCoordinate(azel['az'].values, 
+                                    N = azel['el'].values.shape[0], 
+                                    method = 'nearest')
         # Convert Coordinates to WSG84
         lat, lon, alt = circular2lla(az = azi, el = eli, lat0 = lla['lat'], 
                                      lon0 = lla['lon'], alt0 = 0,
                                      mapping_altitude = mapping_altitude)
         # Interpolate WSG84 coordinated and image into an ascending pixel order
         # utilizing Delauny triangularion super speed up interpolation
-        X,Y,Z = interpSpeedUp(x_in = lon, y_in = lat, image = img[wavelen == w, ...], verbose = True)
-        
+        X, Y, Z = interpSpeedUp(x_in = lon, y_in = lat, image = img, verbose = True)
+        # Mask the field-of-view @ elevation angle
+        if el_mask is not None:
+            mask = eli < el_mask
+            Z[:,mask] = np.nan
+            data.attrs['el_mask'] = el_mask
+        data['el'] = (('y', 'x'), eli)
+        data['az'] = (('y', 'x'), azi)
         data['image'] = (('time', 'x', 'y'), Z)
         data.coords['lat'] = (('x','y'), Y)
         data.coords['lon'] = (('x','y'), X)
