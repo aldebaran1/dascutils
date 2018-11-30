@@ -3,7 +3,7 @@
 [![image](https://travis-ci.org/scivision/dascutils.svg?branch=master)](https://travis-ci.org/scivision/dascutils)
 [![image](https://coveralls.io/repos/github/scivision/dascutils/badge.svg?branch=master)](https://coveralls.io/github/scivision/dascutils?branch=master)
 [![image](https://ci.appveyor.com/api/projects/status/xrtb6fc3d4ojp507?svg=true)](https://ci.appveyor.com/project/scivision/dascutils)
-[![Maintainability](https://api.codeclimate.com/v1/badges/36b08deedc7d2bf750c8/maintainability)](https://codeclimate.com/github/scivision/dascutils/maintainability)
+[![Maintainability](https://api.codeclimate.com/v1/badges/36b08deedc7d2bf750c8/maintainability)](https://codeclimate.com/github/aldebaran1/dascutils/maintainability)
 
 # DASC all-sky camera utilitiess
 
