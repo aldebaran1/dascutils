@@ -38,12 +38,12 @@ def _convert(folder: str = '',
 
 def main():
     p = ArgumentParser()
-    p.add_argument('folder', help='start/end times UTC e.g. 2012-11-03T06:23Z')
+    p.add_argument('folder', help='Input folder with FITS files')
     p.add_argument('-o', '--odir', help='directory/filename to write/save the netCDF file')
     p.add_argument('-t', '--tlim', help='start/end times UTC e.g. 2012-11-03T06:23:00', nargs = 2)
     p.add_argument('--azcal', default=None)
     p.add_argument('--elcal', default=None)
-    p.add_argument('-c', '--coords', help='coordinate system: polar or wsg', default='PKR')
+    p.add_argument('-c', '--coords', help='coordinate system: polar or wsg', default='polar')
     p.add_argument('-a', '--alt', help='mapping altitude if coord=wsg', default=100, type=int)
     p.add_argument('-w', '--wl', help='Choose the wavelength', default=558)
     p.add_argument('--mask', help='elevation mask', default=None, type=int)
