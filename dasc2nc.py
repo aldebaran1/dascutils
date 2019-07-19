@@ -7,6 +7,7 @@ Created on Wed Nov 28 11:35:27 2018
 
 import dascutils as du
 from argparse import ArgumentParser
+import os
 
 def _convert(folder: str = '',
              azel: list = None,
@@ -17,8 +18,8 @@ def _convert(folder: str = '',
              el_mask: int = None,
              ofn: str = None):
     if (azel is None) or (None in azel):
-        az_cal = 'C:\\Users\\smrak\Google Drive\\BU\\Projects\\TheMahali\\data\\dasc\\cfg\\PKR_DASC_20110112_AZ_10deg.fits'
-        el_cal = 'C:\\Users\\smrak\\Google Drive\\BU\\Projects\\TheMahali\\data\\dasc\\cfg\\PKR_DASC_20110112_EL_10deg.fits'
+        az_cal = os.path.join( os.getcwd(), 'cal/PKR_DASC_0558_20150213_Az.FIT')
+        el_cal = os.path.join( os.getcwd(), 'cal/PKR_DASC_0558_20150213_El.FIT')
         azel = [az_cal, el_cal]
     else:
         assert len(azel) == 2

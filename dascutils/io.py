@@ -268,8 +268,9 @@ def load(fin: Union[Path, Sequence[Path]],
         return data
     else:
         # Convert datetime to posix. netCDf cannot save datetime
-        posix_time = datetime2posix(data.time.values)
-        data['time'] = posix_time
+        if isinstance(data.time.values[0], datetime):
+            posix_time = datetime2posix(data.time.values)
+            data['time'] = posix_time
         if wavelen is not None:
             data.attrs['cadence'] = cadence[wavelen[0]]
         # To HDF
